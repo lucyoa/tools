@@ -1,12 +1,12 @@
 from scapy.all import sniff
-from sniffer.arp_pkt import ArpPkt
+from sniffer.arp_pkt import ARPPkt 
 
 
-class ArpSniff(object):
+class ARPSniffer(object):
     def sniff(self):
         sniff(filter="arp",
               prn=self.parse_arp)
 
     def parse_arp(self, pkt):
-        arp = ArpPkt(pkt)
+        arp = ARPPkt(pkt)
         arp.print_info()

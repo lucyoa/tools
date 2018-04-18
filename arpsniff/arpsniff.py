@@ -4,7 +4,7 @@ import sniffer
 
 
 def main():
-    arpmonitor = sniffer.ArpSniff()
+    arpmonitor = sniffer.ARPSniffer()
     arpmonitor.sniff()
 
 if __name__ == "__main__":

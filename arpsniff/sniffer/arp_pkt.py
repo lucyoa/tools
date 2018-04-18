@@ -4,7 +4,7 @@ from scapy.all import (
 )
 
 
-class ArpPkt(object):
+class ARPPkt(object):
     def __init__(self, pkt):
         # Ether
         self.dst = pkt[Ether].dst
