@@ -1,6 +1,8 @@
+import importlib
+import requests
+import json
 import dns.resolver, dns.reversename
 from os import listdir
-import importlib
 
 
 VENDORS = {}
@@ -48,3 +50,17 @@ def resolve_ip(ip):
         pass
 
     return hostname
+
+
+def lookup_dhcpv4(dhcpv4):
+    url = "https://fingerbank.inverse.ca/api/v1/combinations/interogate?key=javascript-lib&dhcp_fingerprint={}".format(dhcpv4)
+    response = requests.get(url, headers={"X-Fingerbank-Lib": "Inverse-Javascript-Lib"})
+
+    if response:
+        data = json.loads(response.text)       
+
+        if "device" in data.keys() and "name" in data["device"].keys():
+            return data["device"]["name"]
+
+    return None
+

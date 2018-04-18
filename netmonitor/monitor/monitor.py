@@ -6,8 +6,10 @@ from scapy.all import (
     sniff,
     srp,
     Ether,
+    conf,
     ARP,
-    conf
+    BOOTP,
+    DHCP,
 )
 
 
@@ -22,28 +24,64 @@ class Sniffer(threading.Thread):
         self.last_display = None 
 
     def run(self):
-        sniff(filter="arp",
+        sniff(filter="arp or (udp and (port 67 or 68))",
               prn=self.parse_packet,
               stop_filter=lambda p: self.e.is_set())
 
     def parse_packet(self, pkt):
-        if not pkt.haslayer(ARP) or \
-           pkt[Ether].src in ["00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"] or \
-           pkt[ARP].psrc in ["127.0.0.1", "0.0.0.0"]:
+        if pkt[Ether].src in ["00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"]:
             return
 
-        asset = self.get_asset(pkt[Ether].src)
-        if not asset:
-            asset = Asset(pkt[Ether].src, pkt[ARP].psrc)
-            ASSETS.append(asset)
-        else:
-            asset.appeared()
+        if pkt.haslayer(ARP):
+            self.parse_arp(pkt)
+
+        elif pkt.haslayer(BOOTP):
+            self.parse_dhcp(pkt)
 
         now = int(time.time())
         for asset in ASSETS:
             if now - asset.last_seen > 120:
                 asset.disappeared()
 
+    def parse_arp(self, pkt):
+        if pkt[ARP].psrc in ["127.0.0.1", "0.0.0.0"]:
+            return
+
+        mac = pkt[Ether].src
+        ip = pkt[ARP].psrc
+
+        asset = self.get_asset(mac)
+        if not asset:
+            asset = Asset(mac, ip=ip)
+            ASSETS.append(asset)
+
+        asset.appeared(ip)
+
+
+    def parse_dhcp(self, pkt):
+        dhcp = pkt.getlayer(DHCP)
+
+        mac = pkt[Ether].src
+        hostname = None
+        dhcpv4 = None
+
+        for opt in dhcp.options:
+            if opt[0] == "message-type" and opt[1] != 3:
+                return
+
+            if opt[0] == "hostname":
+                hostname = str(opt[1], "utf-8")
+            elif opt[0] == "param_req_list":
+                dhcpv4 = ",".join([str(param) for param in opt[1]])
+
+        asset = self.get_asset(mac)
+        if not asset:
+            asset = Asset(mac)
+            ASSETS.append(asset)
+
+        asset.dhcp_request(hostname, dhcpv4)
+
+    
     def get_asset(self, mac):
         for asset in ASSETS:
             if asset.mac == mac:

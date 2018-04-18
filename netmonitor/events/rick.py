@@ -7,6 +7,8 @@ class Event(Event):
         self.opened = False
 
     def trigger(self, event, asset):
+        return False
+
         if not self.opened and event is "appeared":
             self.opened = True
             return True
