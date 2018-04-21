@@ -26,7 +26,8 @@ class Sniffer(threading.Thread):
     def run(self):
         sniff(filter="arp or (udp and (port 67 or 68))",
               prn=self.parse_packet,
-              stop_filter=lambda p: self.e.is_set())
+              stop_filter=lambda p: self.e.is_set(),
+              store=0)
 
     def parse_packet(self, pkt):
         if pkt[Ether].src in ["00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"]:
