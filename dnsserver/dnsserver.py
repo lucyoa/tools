@@ -22,9 +22,7 @@ def load_zones():
 
     return json_zone
 
-
 zone_data = load_zones()
-print(zone_data)
 
 def get_flags(flags):
     byte1, byte2 = struct.unpack(">BB", flags)
@@ -66,33 +64,91 @@ def get_question_domain(data):
     return (domain_parts, question_type)
         
 
-def getzone():
-    pass
+def get_zone(domain):
+    global zone_data
+
+    zone_name = ".".join(domain)
+    return zone_data[zone_name]
 
 
-def getrecs(data):
+def get_recs(data):
     domain, question_type = get_question_domain(data)
 
+    qt = ""
     if question_type == b"\x00\x01":
         qt = "A"
 
+    zone = get_zone(domain)
+    return (zone[qt], qt, domain)
+
+
+def build_question(domainname, rectype):
+    qbytes = b"" 
+
+    for part in domainname:
+        length = len(part) 
+        qbytes += bytes([length])
+        
+        for char in part:
+            qbytes += ord(char).to_bytes(1, byteorder="big")
+
+    qbytes += b"\x00"
+
+    if rectype == "A":
+        qbytes += (1).to_bytes(2, byteorder="big")
+
+    qbytes += (1).to_bytes(2, byteorder="big")
+
+    return qbytes
+
+def rectobytes(domainname, rectype, recttl, recval):
+    rbytes = b"\xc0\x0c"
+
+    if rectype == "A":
+        rbytes = rbytes + bytes([0]) + bytes([1])
+
+    rbytes = rbytes + bytes([0]) + bytes([1])
+    rbytes += int(recttl).to_bytes(4, byteorder="big")
+
+    if rectype == "A":
+        rbytes = rbytes + bytes([0]) + bytes([4])
+
+        for part in recval.split("."):
+            rbytes += bytes([int(part)])
+
+    return rbytes
+
 def build_response(data):
-    TransactionID, = struct.unpack(">H", data[:2])
+    TransactionID = struct.unpack(">H", data[:2])[0].to_bytes(2, byteorder="big")
 
     # Get the flags
     Flags = get_flags(data[2:4])
 
-
     # Question Count
     QDCOUNT = b"\x00\x01"
 
-    domain = get_question_domain(data[12:])
-    print(domain)
+    recs = get_recs(data[12:])
+    ANCOUNT = len(recs).to_bytes(2, byteorder="big")
 
+    # Nameserver Count
+    NSCOUNT = (0).to_bytes(2, byteorder="big")
 
-    return b"Hello"
+    # additional count
+    ARCOUNT  = (0).to_bytes(2, byteorder="big")
 
+    dnsheaders = TransactionID + Flags + QDCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
 
+    dnsbody = b""
+
+    records, rectype, domainname = recs 
+    print(records)
+
+    dnsquestion = build_question(domainname, rectype)
+
+    for record in records:
+        dnsbody += rectobytes(domainname, rectype, record["ttl"], record["value"])
+
+    return dnsheaders + dnsquestion + dnsbody
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
